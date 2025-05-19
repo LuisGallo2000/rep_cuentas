@@ -1,7 +1,37 @@
 {% extends 'core/base.html' %}
 {% block content %}
 <h2>Pagos</h2>
-<a href="{% url 'crear_pago' %}" class="btn btn-success mb-3">+ Nuevo pago</a>
+<a href="{% url 'crear_pago' %}" class="btn btn-success mb-3">
+    <i class="bi bi-currency-dollar"></i> Nuevo pago
+</a>
+
+<form method="get" class="row g-3 mb-4">
+    <div class="col-md-4">
+        <select name="proveedor" class="form-select">
+            <option value="">-- Proveedor --</option>
+            {% for proveedor in proveedores %}
+                <option value="{{ proveedor.proveedor_id }}" {% if proveedor_id == proveedor.proveedor_id|stringformat:"s" %}selected{% endif %}>
+                    {{ proveedor.nombre }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-3">
+        <input type="date" name="desde" class="form-control" value="{{ desde }}">
+    </div>
+    <div class="col-md-3">
+        <input type="date" name="hasta" class="form-control" value="{{ hasta }}">
+    </div>
+    <div class="col-md-1 d-grid">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-search"></i>
+        </button>
+    </div>
+    <div class="col-md-1 d-grid">
+        <a href="{% url 'listar_pagos' %}" class="btn btn-secondary">Limpiar</a>
+    </div>
+</form>
+
 
 <table class="table table-bordered table-striped">
     <thead>
@@ -19,10 +49,12 @@
             <td>{{ pago.cuenta.nro_documento }}</td>
             <td>{{ pago.cuenta.proveedor.nombre }}</td>
             <td>{{ pago.fecha_pago }}</td>
-            <td>{{ pago.monto_pagado }}</td>
+            <td>S/ {{ pago.monto_pagado }}</td>
             <td>
-                <a href="{% url 'eliminar_pago' pago.pago_id %}" class="btn btn-sm btn-danger"
-                   onclick="return confirm('¿Estás seguro de eliminar este pago?')">Eliminar</a>
+                <a href="{% url 'eliminar_pago' pago.pago_id %}" class="btn btn-sm btn-danger" title="Eliminar pago"
+                   onclick="return confirm('¿Estás seguro de eliminar este pago?')">
+                    <i class="bi bi-trash-fill text-white"></i>
+                </a>
             </td>
         </tr>
         {% empty %}

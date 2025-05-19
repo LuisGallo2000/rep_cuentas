@@ -1,13 +1,12 @@
+from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.shortcuts import render
-from datetime import datetime
-from django.http import JsonResponse
+import uuid
 
 from .models import Proveedor, CuentaPorPagar, TipoDocumento, Pago
 from .forms import ProveedorForm, CuentaPorPagarForm, PagoForm
@@ -40,13 +39,31 @@ def logout_user(request):
 # Listado de proveedores
 @login_required
 def listar_proveedores(request):
-    proveedores_list = Proveedor.objects.all()
-    paginator = Paginator(proveedores_list, 5)
+    nombre = request.GET.get('nombre', '')
+    ruc = request.GET.get('ruc', '')
+    estado = request.GET.get('estado', '')
 
+    proveedores_list = Proveedor.objects.all()
+
+    if nombre:
+        proveedores_list = proveedores_list.filter(nombre__icontains=nombre)
+    if ruc:
+        proveedores_list = proveedores_list.filter(ruc__icontains=ruc)
+    if estado:
+        proveedores_list = proveedores_list.filter(estado=int(estado))
+
+
+    paginator = Paginator(proveedores_list, 5)
     page = request.GET.get('page')
     proveedores = paginator.get_page(page)
 
-    return render(request, 'core/proveedores/listar.html', {'proveedores': proveedores})
+    return render(request, 'core/proveedores/listar.html', {
+        'proveedores': proveedores,
+        'nombre': nombre,
+        'ruc': ruc,
+        'estado': estado,
+    })
+
 
 # Crear proveedor
 @login_required
@@ -97,7 +114,7 @@ def listar_cuentas(request):
     # Filtro de búsqueda general (proveedor o número de documento)
     if query:
         cuentas = cuentas.filter(
-            Q(proveedor__nombre__icontains=query) |
+            Q(proveedor_nombre_icontains=query) |
             Q(nro_documento__icontains=query)
         )
 
@@ -111,7 +128,7 @@ def listar_cuentas(request):
             estado_int = int(estado)
             cuentas = cuentas.filter(estado=estado_int)
         except ValueError:
-            pass  # Ignorar si no es un número válido
+            pass
 
     # Filtro por fecha de emisión
     if fecha_desde:
@@ -171,7 +188,7 @@ def crear_cuenta(request):
         form = CuentaPorPagarForm()
     return render(request, 'core/cuentas/formulario.html', {'form': form})
 
-# Editar cuenta por pagar
+# Editar cuenta
 @login_required
 def editar_cuenta(request, pk):
     cuenta = get_object_or_404(CuentaPorPagar, pk=pk)
@@ -182,7 +199,7 @@ def editar_cuenta(request, pk):
         return redirect('listar_cuentas')
     return render(request, 'core/cuentas/formulario.html', {'form': form})
 
-# Eliminar cuenta por pagar
+# Eliminar cuenta
 @login_required
 def eliminar_cuenta(request, pk):
     cuenta = get_object_or_404(CuentaPorPagar, pk=pk)
@@ -193,13 +210,54 @@ def eliminar_cuenta(request, pk):
 # Listar pagos
 @login_required
 def listar_pagos(request):
-    pagos_list = Pago.objects.select_related('cuenta__proveedor').all()
-    paginator = Paginator(pagos_list, 5)
+    pagos = Pago.objects.select_related('cuenta__proveedor', 'cuenta__tipo_documento').all()
+    proveedores = Proveedor.objects.all()
 
+    # Obtener filtros desde GET
+    proveedor_id = request.GET.get('proveedor')
+    fecha_desde = request.GET.get('desde')
+    fecha_hasta = request.GET.get('hasta')
+
+    # Filtro por proveedor (validar UUID)
+    if proveedor_id:
+        try:
+            proveedor_uuid = uuid.UUID(proveedor_id)
+            pagos = pagos.filter(cuenta__proveedor_id=proveedor_uuid)
+        except ValueError:
+            pass  # proveedor_id inválido, ignorar filtro
+        
+    # Filtro por fecha de pago
+    if fecha_desde:
+        try:
+            desde_date = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+            pagos = pagos.filter(fecha_pago__gte=desde_date)
+        except ValueError:
+            pass
+
+    if fecha_hasta:
+        try:
+            hasta_date = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+            pagos = pagos.filter(fecha_pago__lte=hasta_date)
+        except ValueError:
+            pass
+
+    # Ordenar por fecha de pago descendente (los últimos primero)
+    pagos = pagos.order_by('-fecha_pago')
+
+    # Paginación (ejemplo: 10 por página)
+    paginator = Paginator(pagos, 5)
     page = request.GET.get('page')
-    pagos = paginator.get_page(page)
+    pagos_paginados = paginator.get_page(page)
 
-    return render(request, 'core/pagos/listar.html', {'pagos': pagos})
+    context = {
+        'pagos': pagos_paginados,
+        'proveedores': proveedores,
+        'proveedor_id': proveedor_id,
+        'desde': fecha_desde,
+        'hasta': fecha_hasta,
+    }
+
+    return render(request, 'core/pagos/listar.html', context)
 
 # Crear pago
 @login_required

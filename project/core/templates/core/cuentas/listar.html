@@ -4,7 +4,9 @@
 {% block content %}
 <div class="container mt-4">
     <h2>Cuentas por Pagar</h2>
-    <a href="{% url 'crear_cuenta' %}" class="btn btn-success mb-3">+ Nueva cuenta</a>
+    <a href="{% url 'crear_cuenta' %}" class="btn btn-success mb-3">
+        <i class="bi bi-wallet2"></i> Nueva cuenta
+    </a>
 
     {% if cuentas_por_vencer %}
     <div class="alert alert-warning">
@@ -40,7 +42,9 @@
             <input type="date" name="hasta" class="form-control" value="{{ hasta }}">
         </div>
         <div class="col-md-1 d-grid">
-            <button type="submit" class="btn btn-primary">Filtrar</button>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-search"></i>
+            </button>
         </div>
         <div class="col-md-1 d-grid">
             <a href="{% url 'listar_cuentas' %}" class="btn btn-secondary">Limpiar</a>
@@ -57,7 +61,7 @@
                 <th>F. Emisión</th>
                 <th>F. Vencimiento</th>
                 <th>Monto Total</th>
-                <th>Monto Abonado</th>  {# Nueva columna #}
+                <th>Monto Abonado</th>
                 <th>Saldo Pendiente</th>
                 <th>Estado</th>
                 <th>Acciones</th>
@@ -72,7 +76,7 @@
                 <td>{{ cuenta.fecha_emision }}</td>
                 <td>{{ cuenta.fecha_vencimiento }}</td>
                 <td>S/ {{ cuenta.monto_total }}</td>
-                <td>S/ {{ cuenta.monto_abonado }}</td>  {# Mostrar el monto abonado #}
+                <td>S/ {{ cuenta.monto_abonado }}</td>
                 <td>S/ {{ cuenta.saldo_pendiente }}</td>
                 <td>
                     {% if cuenta.estado == 1 %}
@@ -86,9 +90,13 @@
                     {% endif %}
                 </td>
                 <td>
-                    <a href="{% url 'editar_cuenta' cuenta.cuenta_id %}" class="btn btn-sm btn-primary">Editar</a>
-                    <a href="{% url 'eliminar_cuenta' cuenta.cuenta_id %}" class="btn btn-sm btn-danger"
-                       onclick="return confirm('¿Estás seguro de eliminar esta cuenta?')">Eliminar</a>
+                    <a href="{% url 'editar_cuenta' cuenta.cuenta_id %}" class="btn btn-sm btn-warning">
+                        <i class="bi bi-pencil-fill" title="Editar Cuenta"></i>
+                    </a>
+                    <a href="{% url 'eliminar_cuenta' cuenta.cuenta_id %}" class="btn btn-sm btn-danger" title="Eliminar cuenta"
+                       onclick="return confirm('¿Estás seguro de eliminar esta cuenta?')">
+                        <i class="bi bi-trash-fill text-white"></i>
+                    </a>
                 </td>
             </tr>
             {% endfor %}
@@ -96,7 +104,7 @@
     </table>
 
     {% if cuentas.has_other_pages %}
-        <nav>
+    <nav>
         <ul class="pagination">
             {% if cuentas.has_previous %}
             <li class="page-item">
@@ -122,4 +130,4 @@
     <p>No hay cuentas registradas.</p>
     {% endif %}
 </div>
-{% endblock %}
+{% endblock %}

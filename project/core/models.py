@@ -103,7 +103,6 @@ class Pago(models.Model):
                 pago_actual = Pago.objects.get(pk=self.pk)
                 saldo_actual += pago_actual.monto_pagado
             except Pago.DoesNotExist:
-                # Si no existe, asumir saldo_actual sin modificar
                 pass
 
         if self.monto_pagado > saldo_actual:
