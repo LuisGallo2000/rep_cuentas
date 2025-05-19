@@ -3,6 +3,10 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from datetime import date, timedelta
+from django.core.paginator import Paginator
+from django.db.models import Q
+from django.shortcuts import render
+from datetime import datetime
 
 from .models import Proveedor, CuentaPorPagar, TipoDocumento, Pago
 from .forms import ProveedorForm, CuentaPorPagarForm, PagoForm
@@ -35,7 +39,12 @@ def logout_user(request):
 # Listado de proveedores
 @login_required
 def listar_proveedores(request):
-    proveedores = Proveedor.objects.all()
+    proveedores_list = Proveedor.objects.all()
+    paginator = Paginator(proveedores_list, 5)
+
+    page = request.GET.get('page')
+    proveedores = paginator.get_page(page)
+
     return render(request, 'core/proveedores/listar.html', {'proveedores': proveedores})
 
 # Crear proveedor
@@ -70,29 +79,80 @@ def eliminar_proveedor(request, pk):
     messages.success(request, "Proveedor eliminado")
     return redirect('listar_proveedores')
 
-# Listar cuentas por pagar
+# Listar cuentas por pagar con filtros y alertas
 @login_required
 def listar_cuentas(request):
     cuentas = CuentaPorPagar.objects.select_related('proveedor', 'tipo_documento').all()
     proveedores = Proveedor.objects.all()
 
+    # Filtros
+    # Obtener filtros desde GET
+    query = request.GET.get('q', '')
     proveedor_id = request.GET.get('proveedor')
+    estado = request.GET.get('estado', '')
     fecha_desde = request.GET.get('desde')
     fecha_hasta = request.GET.get('hasta')
 
+    # Filtro de búsqueda general (proveedor o número de documento)
+    if query:
+        cuentas = cuentas.filter(
+            Q(proveedor__nombre__icontains=query) |
+            Q(nro_documento__icontains=query)
+        )
+
+    # Filtro por proveedor
     if proveedor_id:
         cuentas = cuentas.filter(proveedor_id=proveedor_id)
 
+    # Filtro por estado
+    if estado:
+        try:
+            estado_int = int(estado)
+            cuentas = cuentas.filter(estado=estado_int)
+        except ValueError:
+            pass  # Ignorar si no es un número válido
+
+    # Filtro por fecha de emisión
     if fecha_desde:
-        cuentas = cuentas.filter(fecha_emision__gte=fecha_desde)
+        try:
+            desde_date = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+            cuentas = cuentas.filter(fecha_emision__gte=desde_date)
+        except ValueError:
+            pass
 
     if fecha_hasta:
-        cuentas = cuentas.filter(fecha_emision__lte=fecha_hasta)
+        try:
+            hasta_date = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+            cuentas = cuentas.filter(fecha_emision__lte=hasta_date)
+        except ValueError:
+            pass
+
+    # Ordenar por fecha de emisión
+    cuentas = cuentas.order_by('fecha_emision')
+
+    # Alerta: cuentas por vencer en los próximos 7 días
+    hoy = date.today()
+    proximo_limite = hoy + timedelta(days=7)
+    cuentas_por_vencer = cuentas.filter(
+        fecha_vencimiento__range=(hoy, proximo_limite),
+        saldo_pendiente__gt=0
+    )
+
+    # Paginación
+    paginator = Paginator(cuentas, 5)
+    page = request.GET.get('page')
+    cuentas_paginadas = paginator.get_page(page)
 
     context = {
-        'cuentas': cuentas,
+        'cuentas': cuentas_paginadas,
         'proveedores': proveedores,
+        'query': query,
+        'proveedor_id': proveedor_id,
+        'estado': estado,
+        'desde': fecha_desde,
+        'hasta': fecha_hasta,
     }
+
     return render(request, 'core/cuentas/listar.html', context)
 
 
@@ -131,7 +191,12 @@ def eliminar_cuenta(request, pk):
 # Listar pagos
 @login_required
 def listar_pagos(request):
-    pagos = Pago.objects.select_related('cuenta__proveedor').all()
+    pagos_list = Pago.objects.select_related('cuenta__proveedor').all()
+    paginator = Paginator(pagos_list, 5)
+
+    page = request.GET.get('page')
+    pagos = paginator.get_page(page)
+
     return render(request, 'core/pagos/listar.html', {'pagos': pagos})
 
 # Crear pago

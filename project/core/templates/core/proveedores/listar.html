@@ -1,9 +1,8 @@
 {% extends 'core/base.html' %}
-
 {% block title %}Proveedores{% endblock %}
 
 {% block content %}
-<h2>Lista de Proveedores</h2>
+<h2>Proveedores</h2>
 <a href="{% url 'crear_proveedor' %}" class="btn btn-success mb-3">+ Nuevo proveedor</a>
 
 <table class="table table-bordered table-striped">
@@ -35,4 +34,28 @@
         {% endfor %}
     </tbody>
 </table>
+
+{% if proveedores.has_other_pages %}
+<nav>
+    <ul class="pagination">
+        {% if proveedores.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ proveedores.previous_page_number }}">Anterior</a>
+        </li>
+        {% endif %}
+
+        {% for num in proveedores.paginator.page_range %}
+        <li class="page-item {% if proveedores.number == num %}active{% endif %}">
+            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+        </li>
+        {% endfor %}
+
+        {% if proveedores.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ proveedores.next_page_number }}">Siguiente</a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
 {% endblock %}
