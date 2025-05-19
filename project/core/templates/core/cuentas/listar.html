@@ -1,0 +1,88 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Cuentas por Pagar</h2>
+    <a href="{% url 'crear_cuenta' %}" class="btn btn-success mb-3">+ Nueva cuenta</a>
+
+    {% if cuentas.exists %}
+    {% if cuentas_por_vencer %}
+    <div class="alert alert-warning">
+        <strong>¡Atención!</strong> Tienes {{ cuentas_por_vencer.count }} cuenta(s) por pagar que vencen en los próximos 7 días.
+        <ul>
+            {% for cuenta in cuentas_por_vencer %}
+            <li>
+                <strong>{{ cuenta.proveedor.nombre }}</strong> - 
+                {{ cuenta.nro_documento }} (vence el {{ cuenta.fecha_vencimiento }}) - 
+                <strong>Saldo pendiente: S/ {{ cuenta.saldo_pendiente }}</strong>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <form method="get" class="row mb-3">
+        <div class="col-md-4">
+            <label for="proveedor">Proveedor:</label>
+            <select name="proveedor" id="proveedor" class="form-control">
+                <option value="">Todos</option>
+                {% for proveedor in proveedores %}
+                    <option value="{{ proveedor.id }}" {% if proveedor.id|stringformat:"s" == request.GET.proveedor %}selected{% endif %}>
+                        {{ proveedor.nombre }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label for="desde">Desde:</label>
+            <input type="date" name="desde" id="desde" class="form-control" value="{{ request.GET.desde }}">
+        </div>
+        <div class="col-md-3">
+            <label for="hasta">Hasta:</label>
+            <input type="date" name="hasta" id="hasta" class="form-control" value="{{ request.GET.hasta }}">
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+            <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+        </div>
+    </form>
+
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th>Proveedor</th>
+                <th>Tipo Documento</th>
+                <th>Nro Documento</th>
+                <th>F. Emisión</th>
+                <th>F. Vencimiento</th>
+                <th>Monto Total</th>
+                <th>Saldo Pendiente</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cuenta in cuentas %}
+            <tr>
+                <td>{{ cuenta.proveedor.nombre }}</td>
+                <td>{{ cuenta.tipo_documento.nombre }}</td>
+                <td>{{ cuenta.nro_documento }}</td>
+                <td>{{ cuenta.fecha_emision }}</td>
+                <td>{{ cuenta.fecha_vencimiento }}</td>
+                <td>S/ {{ cuenta.monto_total }}</td>
+                <td>S/ {{ cuenta.saldo_pendiente }}</td>
+                <td>{{ cuenta.get_estado_display }}</td>
+                <td>
+                    <a href="{% url 'editar_cuenta' cuenta.cuenta_id %}" class="btn btn-sm btn-primary">Editar</a>
+                    <a href="{% url 'eliminar_cuenta' cuenta.cuenta_id %}" class="btn btn-sm btn-danger"
+                       onclick="return confirm('¿Estás seguro de eliminar esta cuenta?')">Eliminar</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No hay cuentas registradas.</p>
+    {% endif %}
+</div>
+{% endblock %}

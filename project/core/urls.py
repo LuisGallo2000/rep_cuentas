@@ -11,4 +11,16 @@ urlpatterns = [
     path('proveedores/nuevo/', views.crear_proveedor, name='crear_proveedor'),
     path('proveedores/editar/<uuid:pk>/', views.editar_proveedor, name='editar_proveedor'),
     path('proveedores/eliminar/<uuid:pk>/', views.eliminar_proveedor, name='eliminar_proveedor'),
+
+    # Cuentas por pagar
+    path('cuentas/', views.listar_cuentas, name='listar_cuentas'),
+    path('cuentas/nueva/', views.crear_cuenta, name='crear_cuenta'),
+    path('cuentas/editar/<uuid:pk>/', views.editar_cuenta, name='editar_cuenta'),
+    path('cuentas/eliminar/<uuid:pk>/', views.eliminar_cuenta, name='eliminar_cuenta'),
+
+    # Pagos
+    path('pagos/', views.listar_pagos, name='listar_pagos'),
+    path('pagos/nuevo/', views.crear_pago, name='crear_pago'),
+    path('pagos/eliminar/<uuid:pk>/', views.eliminar_pago, name='eliminar_pago'),
+
 ]

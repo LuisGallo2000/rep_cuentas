@@ -1,6 +1,8 @@
 from django.db import models
 from project.choices import EstadoEntidades, EstadoCuenta
 import uuid
+from django.core.exceptions import ValidationError
+from django.db import transaction
 
 class TipoDocumento(models.Model):
     tipo_documento_id = models.AutoField(primary_key=True)
@@ -59,3 +61,24 @@ class Pago(models.Model):
 
     def __str__(self):
         return f'Pago {self.monto_pagado} - {self.fecha_pago}'
+
+    def clean(self):
+        if self.monto_pagado <= 0:
+            raise ValidationError("El monto pagado debe ser mayor a cero.")
+        if self.pk is None:
+            if self.monto_pagado > self.cuenta.saldo_pendiente:
+                raise ValidationError("El monto pagado no puede exceder el saldo pendiente.")
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        with transaction.atomic():
+            cuenta = self.cuenta
+            nuevo_saldo = cuenta.saldo_pendiente - self.monto_pagado
+            if nuevo_saldo < 0:
+                raise ValidationError("El pago excede el saldo pendiente.")
+            cuenta.saldo_pendiente = nuevo_saldo
+            if nuevo_saldo == 0:
+                from project.choices import EstadoCuenta
+                cuenta.estado = EstadoCuenta.CANCELADA
+            cuenta.save()
+            super().save(*args, **kwargs)
