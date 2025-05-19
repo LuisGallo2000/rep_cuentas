@@ -22,5 +22,7 @@ urlpatterns = [
     path('pagos/', views.listar_pagos, name='listar_pagos'),
     path('pagos/nuevo/', views.crear_pago, name='crear_pago'),
     path('pagos/eliminar/<uuid:pk>/', views.eliminar_pago, name='eliminar_pago'),
+    
+    path('obtener-saldo/', views.obtener_saldo, name='obtener_saldo'),
 
 ]

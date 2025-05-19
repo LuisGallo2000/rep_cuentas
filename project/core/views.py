@@ -7,6 +7,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import render
 from datetime import datetime
+from django.http import JsonResponse
 
 from .models import Proveedor, CuentaPorPagar, TipoDocumento, Pago
 from .forms import ProveedorForm, CuentaPorPagarForm, PagoForm
@@ -145,6 +146,7 @@ def listar_cuentas(request):
 
     context = {
         'cuentas': cuentas_paginadas,
+        'cuentas_por_vencer': cuentas_por_vencer,
         'proveedores': proveedores,
         'query': query,
         'proveedor_id': proveedor_id,
@@ -219,3 +221,13 @@ def eliminar_pago(request, pk):
     pago.delete()
     messages.success(request, "Pago eliminado")
     return redirect('listar_pagos')
+
+# Obtener saldo restante de una cuenta
+@login_required
+def obtener_saldo(request):
+    cuenta_id = request.GET.get('cuenta_id')
+    try:
+        cuenta = CuentaPorPagar.objects.get(pk=cuenta_id)
+        return JsonResponse({'saldo': cuenta.saldo_pendiente})
+    except CuentaPorPagar.DoesNotExist:
+        return JsonResponse({'error': 'Cuenta no encontrada'}, status=404)

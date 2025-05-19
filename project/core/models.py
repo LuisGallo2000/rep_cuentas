@@ -1,8 +1,11 @@
 from django.db import models
+from django.dispatch import receiver
+from django.forms import ValidationError
 from project.choices import EstadoEntidades, EstadoCuenta
 import uuid
-from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db.models.signals import post_save, post_delete
+from django.db.models import Sum
+from django.utils import timezone
 
 class TipoDocumento(models.Model):
     tipo_documento_id = models.AutoField(primary_key=True)
@@ -31,23 +34,57 @@ class Proveedor(models.Model):
     def __str__(self):
         return self.nombre
 
+# Estados de la cuenta
+class EstadoCuenta(models.IntegerChoices):
+    ACTIVA = 1, 'Activa'
+    CANCELADA = 2, 'Cancelada'
+    VENCIDA = 3, 'Vencida'
+
+
 class CuentaPorPagar(models.Model):
     cuenta_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    proveedor = models.ForeignKey(Proveedor, on_delete=models.RESTRICT, db_column='proveedor_id')
-    tipo_documento = models.ForeignKey(TipoDocumento, on_delete=models.RESTRICT)
+    proveedor = models.ForeignKey('Proveedor', on_delete=models.RESTRICT, db_column='proveedor_id')
+    tipo_documento = models.ForeignKey('TipoDocumento', on_delete=models.RESTRICT)
     nro_documento = models.CharField(max_length=20)
     fecha_emision = models.DateField()
     fecha_vencimiento = models.DateField()
     monto_total = models.DecimalField(max_digits=12, decimal_places=2)
-    saldo_pendiente = models.DecimalField(max_digits=12, decimal_places=2)
+
+    # Campo editable al crear la cuenta
+    monto_abonado_inicial = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # Calculados automáticamente
+    monto_abonado = models.DecimalField(max_digits=12, decimal_places=2, default=0, editable=False)
+    saldo_pendiente = models.DecimalField(max_digits=12, decimal_places=2, editable=False, default=0)
     estado = models.IntegerField(choices=EstadoCuenta.choices, default=EstadoCuenta.ACTIVA)
 
     class Meta:
         db_table = 'cuentas_por_pagar'
         ordering = ['fecha_vencimiento']
 
+    def save(self, *args, **kwargs):
+        # Calcular monto_abonado como: inicial + suma de pagos
+        suma_pagos = self.pagos.aggregate(total=Sum('monto_pagado'))['total'] or 0
+        self.monto_abonado = self.monto_abonado_inicial + suma_pagos
+
+        # Calcular saldo pendiente
+        self.saldo_pendiente = max(self.monto_total - self.monto_abonado, 0)
+
+        # Determinar estado
+        hoy = timezone.now().date()
+        if self.saldo_pendiente == 0:
+            self.estado = EstadoCuenta.CANCELADA
+        elif self.fecha_vencimiento < hoy:
+            self.estado = EstadoCuenta.VENCIDA
+        else:
+            self.estado = EstadoCuenta.ACTIVA
+
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f'{self.nro_documento} - {self.proveedor.nombre}'
+
+
 
 class Pago(models.Model):
     pago_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -59,26 +96,31 @@ class Pago(models.Model):
         db_table = 'pagos'
         ordering = ['fecha_pago']
 
-    def __str__(self):
-        return f'Pago {self.monto_pagado} - {self.fecha_pago}'
-
     def clean(self):
-        if self.monto_pagado <= 0:
-            raise ValidationError("El monto pagado debe ser mayor a cero.")
-        if self.pk is None:
-            if self.monto_pagado > self.cuenta.saldo_pendiente:
-                raise ValidationError("El monto pagado no puede exceder el saldo pendiente.")
+        saldo_actual = self.cuenta.saldo_pendiente
+        if self.pk:
+            try:
+                pago_actual = Pago.objects.get(pk=self.pk)
+                saldo_actual += pago_actual.monto_pagado
+            except Pago.DoesNotExist:
+                # Si no existe, asumir saldo_actual sin modificar
+                pass
+
+        if self.monto_pagado > saldo_actual:
+            raise ValidationError(f'El monto pagado ({self.monto_pagado}) no puede ser mayor al saldo pendiente ({saldo_actual}).')
 
     def save(self, *args, **kwargs):
         self.clean()
-        with transaction.atomic():
-            cuenta = self.cuenta
-            nuevo_saldo = cuenta.saldo_pendiente - self.monto_pagado
-            if nuevo_saldo < 0:
-                raise ValidationError("El pago excede el saldo pendiente.")
-            cuenta.saldo_pendiente = nuevo_saldo
-            if nuevo_saldo == 0:
-                from project.choices import EstadoCuenta
-                cuenta.estado = EstadoCuenta.CANCELADA
-            cuenta.save()
-            super().save(*args, **kwargs)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'Pago {self.monto_pagado} - {self.fecha_pago}'
+
+
+@receiver(post_save, sender=Pago)
+@receiver(post_delete, sender=Pago)
+def actualizar_monto_abonado(sender, instance, **kwargs):
+    cuenta = instance.cuenta
+    suma_pagos = cuenta.pagos.aggregate(total=Sum('monto_pagado'))['total'] or 0
+    cuenta.monto_abonado = cuenta.monto_abonado_inicial + suma_pagos
+    cuenta.save()

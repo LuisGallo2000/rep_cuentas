@@ -74,10 +74,10 @@ WSGI_APPLICATION = 'project.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'dbcuentas',
-        'USER': 'admin_cuentas',
-        'PASSWORD': '123456',
-        'HOST': '127.0.0.1',
+        'NAME': 'dbcuentas_e4x9',
+        'USER': 'user',
+        'PASSWORD': 'PDU8Ir1FZ0Lkk7PyKZC6k5eVsU5slaBj',
+        'HOST': 'dpg-d0l4o7d6ubrc73bpn8gg-a.oregon-postgres.render.com',
         'PORT': '5432'
     }
 }
